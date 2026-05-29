@@ -41,7 +41,7 @@ def iniciar_cliente():
         hilo = threading.Thread(target=recibir_mensaje_broadcast, args=(s,), daemon=True)
         hilo.start()
 
-        # bucle de envios recordad no separar con try sin poner en la misma fila 
+        # bucle de envios recordad no separar con try sin poner en la misma fila #es
         while True:
                 mensaje = input("Tú: ")
                 
