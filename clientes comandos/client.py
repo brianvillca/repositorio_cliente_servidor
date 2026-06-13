@@ -35,6 +35,7 @@ def iniciar_cliente():
         print("Conectado al servidor")
         print("lista de comandos")
         print(" -Inicia sesión con: /login <tu_nombre>-obligatorio")
+        print(" -Registro con: /register <tu_nombre>-opcional si tiene cuenta")
         print(" -Envía mensajes a todos: /all <mensaje>")
         print(" -Para salir del server: /salir\n")
         

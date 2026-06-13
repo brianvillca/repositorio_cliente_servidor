@@ -30,11 +30,11 @@ def manejar_cliente(client_socket, addr):
                 print(f'[DESCONEXIÓN CONCRETADA] El cliente {addr} ha cerrado la conexión')
                 break
             if not autenticado:#entra en este si no esta autentificado
-                if mensaje.startswith('/login'):#revisa desde todo el diccionario hasta el 0 para revisar si hay un usuario ya registrado con ese login es un metodo de seguridad
+                if mensaje.startswith('/register'):#revisa desde todo el diccionario hasta el 0 para revisar si hay un usuario ya registrado con ese login es un metodo de seguridad
                     partes = mensaje.split(' ', 1)# separa el mensaje asegurando que este no llegue completamente roto por " " el[0] es directamente el comando que pusimos como /login
                     nombre_pedido = partes[1].strip() if len(partes) > 1 else ""#va a la parte del nombre y limpia con .strip los " " y guarda en nombre pedido. si esta vacio no lo toma y da aviso
                     if not nombre_pedido:
-                        client_socket.send("error: El nombre de usuario no puede estar vacío. Usa: /login <usuario>\n".encode('utf-8'))
+                        client_socket.send("error: El nombre de usuario no puede estar vacío. Usa: /register <usuario>\n".encode('utf-8'))
                         continue
                         
                     with clientes_lock:
@@ -46,7 +46,7 @@ def manejar_cliente(client_socket, addr):
                             autenticado = True#le da permiso para el chat
                             client_socket.send(f"Te has autenticado como '{usuario}'. Ya puedes enviar mensajes.\n".encode('utf-8'))
                 else:
-                    client_socket.send("INFO: Debes iniciar sesión primero con /login <usuario>\n".encode('utf-8'))
+                    client_socket.send("INFO: Debes iniciar sesión primero con /login o crear un usuario con /register <usuario>\n".encode('utf-8'))
                 
                 # para que no intente ejecutar comandos de chat si no estás logueado.
                 continue
