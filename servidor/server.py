@@ -1,8 +1,9 @@
 import socket
 import sys
 import threading
+from base_de_datos import db
 
-clientes = {}
+clientes = {}# Diccionario global para rastrear las conexiones activas en este instante
 clientes_lock = threading.Lock()# Cerrojo (Lock) para asegurar que el manejo del diccionario sea seguro entre hilos
 def broadcast(mensaje, socket_remitente=None):
     """Envía un mensaje a todos los usuarios autenticados, excepto al remitente."""
@@ -29,26 +30,51 @@ def manejar_cliente(client_socket, addr):
             if not mensaje or mensaje == '/salir':
                 print(f'[DESCONEXIÓN CONCRETADA] El cliente {addr} ha cerrado la conexión')
                 break
-            if not autenticado:#entra en este si no esta autentificado
-                if mensaje.startswith('/register'):#revisa desde todo el diccionario hasta el 0 para revisar si hay un usuario ya registrado con ese login es un metodo de seguridad
-                    partes = mensaje.split(' ', 1)# separa el mensaje asegurando que este no llegue completamente roto por " " el[0] es directamente el comando que pusimos como /login
-                    nombre_pedido = partes[1].strip() if len(partes) > 1 else ""#va a la parte del nombre y limpia con .strip los " " y guarda en nombre pedido. si esta vacio no lo toma y da aviso
-                    if not nombre_pedido:
-                        client_socket.send("error: El nombre de usuario no puede estar vacío. Usa: /register <usuario>\n".encode('utf-8'))
+            if not autenticado:
+
+                if mensaje.startswith('/register '):
+                    partes = mensaje.split(' ', 2)
+                    if len(partes) < 3:
+                        client_socket.send("ERROR: Faltan datos. Usa: /register <usuario> <contraseña>\n".encode('utf-8'))
+                        continue
+                        #divide el texto en máximo 3 partes: ['/register', 'usuario', 'contraseña']
+                    nombre_pedido = partes[1].strip()
+                    password_pedido = partes[2].strip()
+                    
+                    #Llamamos a la base de datos
+                    if db.registrar_usuario_db(nombre_pedido, password_pedido):
+                        client_socket.send("ÉXITO: Cuenta creada. Ahora inicia sesión con /login <usuario> <contraseña>\n".encode('utf-8'))
+                    else:
+                        client_socket.send("ERROR: Ese nombre de usuario ya está registrado.\n".encode('utf-8'))
+                    continue
+
+                elif mensaje.startswith('/login '):
+                    partes = mensaje.split(' ', 2)#divide el texto en máximo 3 partes: ['/register', 'usuario', 'contraseña']
+                    if len(partes) < 3:
+                        client_socket.send("ERROR: Faltan datos. Usa: /login <usuario> <contraseña>\n".encode('utf-8'))
                         continue
                         
+                    nombre_pedido = partes[1].strip()
+                    password_pedido = partes[2].strip()
+                    
+                    #Verificamos en PostgreSQL si las credenciales son correctas
+                    if not db.verificar_login_db(nombre_pedido, password_pedido):
+                        client_socket.send("ERROR: Usuario no existe o contraseña incorrecta.\n".encode('utf-8'))
+                        continue
+                    
+                    #Verificamos en el diccionario temporal si ya tiene una sesión abierta
                     with clientes_lock:
-                        if nombre_pedido in clientes.values():#verifica si el nombre ya esta en uso
-                            client_socket.send("error: El nombre de usuario ya esta en uso\n".encode('utf-8'))#manda error en ese caso
+                        if nombre_pedido in clientes.values():
+                            client_socket.send("ERROR: Esta cuenta ya está conectada en otro lado.\n".encode('utf-8'))
                         else:
-                            usuario = nombre_pedido#guarda dentro de usuarios
-                            clientes[client_socket] = usuario#en el diccionario lo guarda
-                            autenticado = True#le da permiso para el chat
-                            client_socket.send(f"Te has autenticado como '{usuario}'. Ya puedes enviar mensajes.\n".encode('utf-8'))
+                            usuario = nombre_pedido
+                            clientes[client_socket] = usuario
+                            autenticado = True
+                            client_socket.send(f"ÉXITO: Te has autenticado como '{usuario}'. Ya puedes chatear.\n".encode('utf-8'))
+                    continue
+
                 else:
-                    client_socket.send("INFO: Debes iniciar sesión primero con /login o crear un usuario con /register <usuario>\n".encode('utf-8'))
-                
-                # para que no intente ejecutar comandos de chat si no estás logueado.
+                    client_socket.send("INFO: Identifícate primero con /register <usuario> <contraseña> o /login <usuario> <contraseña>\n".encode('utf-8'))
                 continue
             if mensaje.startswith('/all'):
                         partes = mensaje.split(' ', 1)#separa el mensaje en partes cortando los " "
@@ -74,21 +100,23 @@ def manejar_cliente(client_socket, addr):
         # Total de hilos menos el principal y el que está muriendo en este punto
         print(f'[CONEXIONES ACTIVAS] {threading.active_count() - 2}')#nos da el dato dentro del server de cuantos hilos abiertos quedan menos el que se cerro y el principal 
 def iniciar_servidor():
+    db.inicializar_base_datos()
     HOST = "127.0.0.1"
     PORT = 12345
 
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server_socket.bind((HOST, PORT))
-    server_socket.listen(5)
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)# Crea el socket usando IPv4 (AF_INET) y el protocolo TCP garantizado (SOCK_STREAM)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)# Permite reutilizar el puerto 12345 de inmediato si el servidor se apaga y se prende rápido
+    server_socket.bind((HOST, PORT))# Asigna la IP y el Puerto al socket del servidor
+    server_socket.listen(5)# Activa la escucha y crea una cola de espera para hasta 5 conexiones simultáneas en cola
     print(f'Servidor activo y escuchando en {HOST}: {PORT}')
 
     while True:
-        conn, addr = server_socket.accept()
-        thread = threading.Thread(target=manejar_cliente, args=(conn, addr))
-        thread.start()
+        conn, addr = server_socket.accept()# Se congela en esta línea hasta que un nuevo cliente intenta conectarse a la red
+        thread = threading.Thread(target=manejar_cliente, args=(conn, addr))# Crea un nuevo hilo de ejecución dedicado exclusivamente a este nuevo cliente
+        thread.start()# Arranca el hilo en segundo plano
         # Se resta 1 por el hilo principal que siempre está corriendo
         print(f'[CONEXIONES ACTIVAS] {threading.active_count() - 1}')
 
 if __name__ == "__main__":
+    # Si este archivo se ejecuta de forma directa en la consola, arranca el servidor
     iniciar_servidor()

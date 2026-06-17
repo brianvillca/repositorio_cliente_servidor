@@ -31,11 +31,11 @@ def iniciar_cliente():
         except ConnectionRefusedError:
             print("error el servidor no esta encendido")
             return
-#menu principal de bienvenida o mensajes de ayuda principales
+        #menu principal de bienvenida o mensajes de ayuda principales
         print("Conectado al servidor")
         print("lista de comandos")
-        print(" -Inicia sesión con: /login <tu_nombre>-obligatorio")
-        print(" -Registro con: /register <tu_nombre>-opcional si tiene cuenta")
+        print(" -Inicia sesión con: /login <tu_nombre> <Contraseña>-obligatorio")
+        print(" -Registro con: /register <tu_nombre> <Contraseña>-opcional si tiene cuenta")
         print(" -Envía mensajes a todos: /all <mensaje>")
         print(" -Para salir del server: /salir\n")
         
