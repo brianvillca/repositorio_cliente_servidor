@@ -1,5 +1,6 @@
 
-
+#Programacion sobre redes- Brian villca cotrina 6°11
+---
 # Chat Multiusuario Asíncrono en Red
 
 Este codigo implementa una comunicación cliente-servidor a través de sockets TCP en Python. Utiliza programación multihilo (`threading`) para manejar múltiples usuarios simultáneamente y conectarse a una base de datos PostgreSQL de forma persistente.
